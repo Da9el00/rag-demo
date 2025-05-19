@@ -1,0 +1,15 @@
+spring:
+  config:
+    import: optional:dotenv:file:./.env
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini
+    vector-store:
+      pinecone:
+        api-key:     ${PINECONE_API_KEY}     # your cloud API key
+        project-id:  ${PINECONE_PROJECT}     # e.g. default
+        environment: ${PINECONE_ENV}         # e.g. us-west1-gcp
+        index-name:  ${INDEX_NAME}

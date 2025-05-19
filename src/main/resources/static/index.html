@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>RAG Demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+
+    <!-- Marked – Markdown parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+    // GitHub-flavored Markdown + single-line breaks
+    marked.setOptions({ gfm: true, breaks: true });
+  </script>
+
+    <style>
+        /* ---- page layout ---- */
+        body {
+            font-family: system-ui, sans-serif;
+            margin: 3rem auto;
+            max-width: 720px;
+            color: #333;
+            background: #fff;
+            line-height: 1.6;
+        }
+        h1 { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: .5rem; font-weight: 500; }
+        input[type="text"] {
+            width: 100%;
+            padding: .6rem .8rem;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: .4rem;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: .8rem;
+            padding: .6rem 1.2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: .4rem;
+            background: #0078ff;
+            color: #fff;
+            cursor: pointer;
+        }
+        button:hover { background: #0068d4; }
+
+        /* ---- rendered Markdown styling ---- */
+        #answer {
+            margin-top: 2rem;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: .4rem;
+            background: #fafafa;
+            overflow-y: auto;
+            min-height: 8rem;
+        }
+        #answer h2 { margin-top: 1rem; }
+        #answer p { margin: .6rem 0; }
+        #answer ul, #answer ol {
+            margin: .6rem 0  .6rem 1.4rem;
+        }
+        #answer li { margin: .3rem 0; }
+        #answer pre {
+            background: #f0f0f0;
+            padding: .6rem;
+            border-radius: .3rem;
+            overflow-x: auto;
+        }
+        #answer code {
+            background: rgba(200,200,200,.2);
+            padding: .2rem .4rem;
+            border-radius: .3rem;
+            font-family: Menlo, monospace;
+            font-size: .95rem;
+        }
+        #answer blockquote {
+            border-left: 4px solid #ccc;
+            margin: .8rem 1rem;
+            padding-left: .8rem;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+<h1>Ask a product question</h1>
+
+<label for="q">Question</label>
+<input id="q" type="text" placeholder="e.g. How does the Saphe Drive Pro work?" />
+
+<button id="ask">Ask</button>
+
+<h2>Answer</h2>
+<div id="answer"></div>
+
+<script>
+    const askBtn   = document.getElementById('ask');
+    const qInput   = document.getElementById('q');
+    const answerEl = document.getElementById('answer');
+
+    askBtn.addEventListener('click', async () => {
+      answerEl.innerHTML = '';
+      let markdown = '';
+      let partial  = '';
+
+      const question = qInput.value.trim() || 'How does the Saphe Drive Pro work?';
+
+      const res = await fetch('/api/chat/ask-stream', {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({ question })
+      });
+
+      if (!res.ok) {
+        answerEl.textContent = 'Server error: ' + res.statusText;
+        return;
+      }
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        partial += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = partial.indexOf('\n\n')) !== -1) {
+          const eventBlock = partial.slice(0, idx);
+          partial          = partial.slice(idx + 2);
+
+          for (const line of eventBlock.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            markdown += line.slice(5);
+          }
+
+          // **Post-process**: ensure every "- " is on its own line
+          // Insert a blank line before any "- " that isn't already at start-of-line
+          const fixed = markdown.replace(
+            /([^\n])(\n?)-\s/g,
+            '$1\n\n- '
+          );
+
+          // Render the fixed Markdown to HTML
+          answerEl.innerHTML = marked.parse(fixed);
+          answerEl.scrollTop = answerEl.scrollHeight;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
