@@ -8,9 +8,9 @@
     <!-- Marked – Markdown parser -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-    // GitHub-flavored Markdown + single-line breaks
-    marked.setOptions({ gfm: true, breaks: true });
-  </script>
+      // GitHub-flavored Markdown + single-line breaks
+      marked.setOptions({ gfm: true, breaks: true });
+    </script>
 
     <style>
         /* ---- page layout ---- */
@@ -44,6 +44,14 @@
             cursor: pointer;
         }
         button:hover { background: #0068d4; }
+
+        /* ---- loading indicator ---- */
+        #loading {
+            display: none;
+            margin-top: 1rem;
+            font-style: italic;
+            color: #555;
+        }
 
         /* ---- rendered Markdown styling ---- */
         #answer {
@@ -89,6 +97,7 @@
 <input id="q" type="text" placeholder="e.g. How does the Saphe Drive Pro work?" />
 
 <button id="ask">Ask</button>
+<div id="loading">Loading answer…</div>
 
 <h2>Answer</h2>
 <div id="answer"></div>
@@ -97,9 +106,12 @@
     const askBtn   = document.getElementById('ask');
     const qInput   = document.getElementById('q');
     const answerEl = document.getElementById('answer');
+    const loadingEl = document.getElementById('loading');
 
     askBtn.addEventListener('click', async () => {
+      // reset UI
       answerEl.innerHTML = '';
+      loadingEl.style.display = 'block';
       let markdown = '';
       let partial  = '';
 
@@ -112,16 +124,19 @@
       });
 
       if (!res.ok) {
+        loadingEl.style.display = 'none';
         answerEl.textContent = 'Server error: ' + res.statusText;
         return;
       }
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
+      let receivedFirst = false;
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+
         partial += decoder.decode(value, { stream: true });
 
         let idx;
@@ -132,6 +147,12 @@
           for (const line of eventBlock.split('\n')) {
             if (!line.startsWith('data:')) continue;
             markdown += line.slice(5);
+          }
+
+          // hide loading indicator on first data
+          if (!receivedFirst) {
+            loadingEl.style.display = 'none';
+            receivedFirst = true;
           }
 
           // **Post-process**: ensure every "- " is on its own line

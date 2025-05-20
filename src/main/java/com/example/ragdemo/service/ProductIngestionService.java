@@ -7,10 +7,8 @@ import com.example.ragdemo.models.Section;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.Page;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +35,7 @@ public class ProductIngestionService {
    * Takes raw website text, splits it into chunks, generates QA for each,
    * wraps into DocumentChunk, and adds them to the vector store.
    */
-  public String addProduct(PageContent pageContent) {
+  public String addProduct(PageContent pageContent, String url) {
     List<Section> sections = pageContent.sections();
     List<DocumentChunk> docs = new ArrayList<>();
 
@@ -81,7 +79,7 @@ public class ProductIngestionService {
       }
     }
 
-    List<Document> documents = toVectorDocuments(docs);
+    List<Document> documents = toVectorDocuments(docs, url);
     vectorStore.add(documents);
 
     return documents.toString();
@@ -107,28 +105,28 @@ public class ProductIngestionService {
     return out;
   }
 
-  private List<Document> toVectorDocuments(List<DocumentChunk> chunks) {
+  private List<Document> toVectorDocuments(List<DocumentChunk> chunks, String url) {
     List<Document> out = new ArrayList<>(chunks.size());
     for (int i = 0; i < chunks.size(); i++) {
       DocumentChunk chunk = chunks.get(i);
 
       String id = UUID.randomUUID() + "-" + i;
 
-      String qaJson;
+      String documentText;
       try {
-        qaJson = mapper.writeValueAsString(chunk.qaPairs());
+        documentText = mapper.writeValueAsString(chunk);
       } catch (JsonProcessingException e) {
-        qaJson = "[]";
+        documentText = "[]";
       }
 
       Map<String,Object> metadata = new HashMap<>();
       metadata.put("chunkIndex", String.valueOf(i));
       metadata.put("title", chunk.pageTitle());
-      metadata.put("qaPairs", qaJson);
+      metadata.put("url", url);
 
       Document doc = new Document(
               id,
-              chunk.text(),
+              documentText,
               metadata
       );
 

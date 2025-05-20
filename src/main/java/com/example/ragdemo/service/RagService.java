@@ -57,7 +57,7 @@ public class RagService {
     List<Document> docs = vectorStore.similaritySearch(
             SearchRequest.builder()
                     .query(question)
-                    .topK(5)
+                    .topK(4)
                     .build());
 
     String context = docs.stream()
@@ -80,11 +80,11 @@ public class RagService {
             .content();
   }
 
-  public String addProduct(String website) {
+  public String addProduct(String url) {
     //Scrape website to get its content
-    PageContent pageContent = webScraperService.scrapePage(website);
+    PageContent pageContent = webScraperService.scrapePage(url);
     //Create document for vectorDB and upload
-    String result = productIngestionService.addProduct(pageContent);
+    String result = productIngestionService.addProduct(pageContent, url);
     return result;
   }
 }
